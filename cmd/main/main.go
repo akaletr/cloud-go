@@ -8,10 +8,13 @@ import (
 	"net/http"
 	"sync"
 
+	"cmd/main/main.go/cmd/internal/transactionLogger"
+
 	"github.com/go-chi/chi/v5"
 )
 
 var ErrorNoSuchKey = errors.New("error: no such key")
+var logger transactionLogger.TransactionLogger
 
 var store = struct {
 	sync.RWMutex
@@ -46,7 +49,7 @@ func Delete(key string) error {
 	return nil
 }
 
-func cloudPutHandlerChi(w http.ResponseWriter, r *http.Request) {
+func putHandler(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -59,14 +62,14 @@ func cloudPutHandlerChi(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	logger.WritePut(key, string(body))
 
 	w.WriteHeader(http.StatusCreated)
 	return
 }
 
-func cloudGetHandlerChi(w http.ResponseWriter, r *http.Request) {
+func getHandler(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
-	fmt.Println(store)
 	value, err := Get(key)
 	if err != nil {
 		if errors.Is(err, ErrorNoSuchKey) {
@@ -82,24 +85,65 @@ func cloudGetHandlerChi(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(value))
 }
 
-func cloudDeleteHandlerChi(w http.ResponseWriter, r *http.Request) {
+func deleteHandler(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
 	err := Delete(key)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	logger.WriteDelete(key)
 
 	w.WriteHeader(http.StatusOK)
 	return
 }
 
+func initializeLogger() error {
+	var err error
+	logger, err = transactionLogger.NewFile("test.txt")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	events, errs := logger.ReadEvents()
+	e, ok := transactionLogger.Event{}, true
+	for ok && err == nil {
+		select {
+		case e, ok = <-events:
+			switch e.Method {
+			case transactionLogger.EventPut:
+				err = Put(e.Key, e.Value)
+				if err != nil {
+					return err
+				}
+			case transactionLogger.EventDelete:
+				err = Delete(e.Key)
+				if err != nil {
+					return err
+				}
+			}
+		case err, ok = <-errs:
+			fmt.Println(err)
+		}
+	}
+
+	logger.Run()
+	return err
+}
+
 func main() {
 	router := chi.NewRouter()
 
-	router.Put("/v1/{key}", cloudPutHandlerChi)
-	router.Get("/v1/{key}", cloudGetHandlerChi)
-	router.Delete("/v1/{key}", cloudDeleteHandlerChi)
+	go func() {
+		err := initializeLogger()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}()
+
+	router.Put("/v1/{key}", putHandler)
+	router.Get("/v1/{key}", getHandler)
+	router.Delete("/v1/{key}", deleteHandler)
 
 	server := http.Server{
 		Addr:    ":8000",
