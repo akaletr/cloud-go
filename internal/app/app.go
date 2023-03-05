@@ -1,11 +1,11 @@
 package app
 
 import (
-	"cmd/main/main.go/internal/mw"
 	"fmt"
 	"net/http"
 
 	"cmd/main/main.go/internal/logger"
+	"cmd/main/main.go/internal/mw"
 	"cmd/main/main.go/internal/storage"
 	"cmd/main/main.go/internal/transactionLogger"
 
