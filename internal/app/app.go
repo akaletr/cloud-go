@@ -21,7 +21,7 @@ type app struct {
 
 func New() (App, error) {
 	st := storage.New()
-	tr, err := transactionLogger.NewFile("test.log")
+	_, err := transactionLogger.NewFile("test.log")
 	if err != nil {
 		return nil, err
 	}
@@ -32,9 +32,14 @@ func New() (App, error) {
 
 	lg := logger.New()
 
+	pg, err := transactionLogger.NewPostgres()
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	return &app{
 		storage:     st,
-		transaction: tr,
+		transaction: pg,
 		server:      &srv,
 		logger:      lg,
 	}, nil
