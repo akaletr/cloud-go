@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"sync"
 
-	"cmd/main/main.go/cmd/internal/transactionLogger"
+	"cmd/main/main.go/internal/transactionLogger"
 
 	"github.com/go-chi/chi/v5"
 )
