@@ -12,5 +12,6 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	defer log.Fatalln(myApp.Stop())
 	log.Fatalln(myApp.Start())
 }

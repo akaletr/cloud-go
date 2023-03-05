@@ -105,3 +105,7 @@ func (logger *fileTransactionLogger) WriteDelete(key string) {
 func (logger *fileTransactionLogger) Err() <-chan error {
 	return logger.errors
 }
+
+func (logger *fileTransactionLogger) Close() error {
+	return logger.file.Close()
+}

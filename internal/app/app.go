@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmd/main/main.go/internal/mw"
 	"fmt"
 	"net/http"
 
@@ -42,41 +43,45 @@ func New() (App, error) {
 func (app *app) Init() error {
 	router := chi.NewRouter()
 
+	router.Use(mw.Limiter)
+
 	router.Put("/v1/{key}", app.putHandler)
 	router.Get("/v1/{key}", app.getHandler)
 	router.Delete("/v1/{key}", app.deleteHandler)
 
 	app.server.Handler = router
 
-	go func() {
-		var err error
-
-		events, errs := app.transaction.ReadEvents()
-		e, ok := transactionLogger.Event{}, true
-
-		for ok && err == nil {
-			select {
-			case e, ok = <-events:
-				switch e.Method {
-				case transactionLogger.EventPut:
-					err = app.storage.Put(e.Key, e.Value)
-					if err != nil {
-						app.logger.Debug(err)
-					}
-				case transactionLogger.EventDelete:
-					err = app.storage.Delete(e.Key)
-					if err != nil {
-						app.logger.Debug(err)
-					}
-				}
-			case err, ok = <-errs:
-				fmt.Println(err)
-			}
-		}
-	}()
-
+	go app.initTransactionLogger()
 	app.transaction.Run()
+
 	return nil
+}
+
+func (app *app) initTransactionLogger() {
+	var err error
+
+	events, errs := app.transaction.ReadEvents()
+	e, ok := transactionLogger.Event{}, true
+
+	for ok && err == nil {
+		select {
+		case e, ok = <-events:
+			switch e.Method {
+			case transactionLogger.EventPut:
+				err = app.storage.Put(e.Key, e.Value)
+				if err != nil {
+					app.logger.Debug(err)
+				}
+			case transactionLogger.EventDelete:
+				err = app.storage.Delete(e.Key)
+				if err != nil {
+					app.logger.Debug(err)
+				}
+			}
+		case err, ok = <-errs:
+			fmt.Println(err)
+		}
+	}
 }
 
 func (app *app) Start() error {
@@ -89,5 +94,5 @@ func (app *app) Start() error {
 }
 
 func (app *app) Stop() error {
-	return nil
+	return app.transaction.Close()
 }
