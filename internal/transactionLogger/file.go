@@ -6,21 +6,6 @@ import (
 	"os"
 )
 
-type EventType uint64
-
-const (
-	_                  = iota
-	EventPut EventType = iota
-	EventDelete
-)
-
-type Event struct {
-	ID     uint64
-	Method EventType
-	Key    string
-	Value  string
-}
-
 type fileTransactionLogger struct {
 	events  chan<- Event
 	errors  <-chan error
@@ -107,5 +92,6 @@ func (logger *fileTransactionLogger) Err() <-chan error {
 }
 
 func (logger *fileTransactionLogger) Close() error {
-	return logger.file.Close()
+	return nil
+	//return logger.file.Close()
 }
